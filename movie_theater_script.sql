@@ -216,33 +216,37 @@ values(4,5);
 
 
 -- determining total price for purchase
--- couldn't quite figure this part out yet
 
-select distinct purchase_id, sum(price) as total_price
-from concession_item
-join concession_items_in_purchase on concession_item.item_id = concession_items_in_purchase.item_id 
-group by purchase_id;
 
-CREATE OR REPLACE PROCEDURE purchasePrice (
-	_purchase_id integer
+create or replace procedure setPrice (
+	_purchase_id int
 )
-LANGUAGE plpgsql
-AS $$
-BEGIN
-	-- Add late fee to customer payment amount
-	UPDATE concession_purchase 
-	select distinct purchase_id, sum(price) as total_price
-	from concession_item
-	join concession_items_in_purchase on concession_item.item_id = concession_items_in_purchase.item_id 
-	group by purchase_id
-	where 
+language plpgsql
+as $$
+begin 
+	update concession_purchase 
+	set price = (select total_price
+		from
+		(
+			select distinct purchase_id, sum(price) as total_price
+			from concession_item
+			join concession_items_in_purchase on concession_item.item_id = concession_items_in_purchase.item_id 
+			group by purchase_id
+		) as prices
+		where purchase_id = _purchase_id )
+	where purchase_id = _purchase_id;
 	
-	SET price = select sum(price) from concession_item
-	WHERE customer_id = customer_id
-		and payment_id = paymentId;
 	
-	-- Commit the above statement inside of a transaction
-	COMMIT;
-	
-END;
+	commit;
+end;
 $$
+
+call setprice(1); 
+select * from concession_purchase cp 
+where purchase_id = 1;
+
+call setprice(2);
+call setprice(3);
+call setprice(4);
+call setprice(5); 
+select * from concession_purchase cp ;
